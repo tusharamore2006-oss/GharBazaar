@@ -1,6 +1,7 @@
 const Enquiry = require("../models/Enquiry");
 const Property = require("../models/Property");
 const Notification = require("../models/Notification");
+const EnquiryMessage = require("../models/EnquiryMessage");
 
 
 // ========================================
@@ -345,8 +346,12 @@ const deleteEnquiry = async (
     );
 
     // ========================================
-    // DELETE RELATED NOTIFICATIONS
+    // DELETE RELATED MESSAGES & NOTIFICATIONS
     // ========================================
+
+    await EnquiryMessage.deleteMany({
+      enquiry: req.params.id,
+    });
 
     await Notification.deleteMany({
       enquiry: req.params.id,

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "./config";
 
 function Profile({
   token,
   user,
-  properties,
+  properties: _properties,
   favoritesCount,
   onBack,
   onAddProperty,
@@ -78,7 +79,7 @@ function Profile({
         setError("");
 
         const response = await fetch(
-          "https://gharbazaar-hb8d.onrender.com/api/properties"
+          `${API_BASE_URL}/properties`
         );
 
         const data = await response.json();
@@ -95,8 +96,8 @@ function Profile({
           user?.id || user?._id;
 
         const ownedProperties =
-          data.filter((property) => {
-            if (!property.owner) {
+          (Array.isArray(data) ? data : []).filter((property) => {
+            if (!property || !property.owner) {
               return false;
             }
 
@@ -107,7 +108,7 @@ function Profile({
                 : property.owner;
 
             return (
-              ownerId === currentUserId
+              String(ownerId) === String(currentUserId)
             );
           });
 
@@ -172,7 +173,7 @@ function Profile({
 
     try {
       const response = await fetch(
-        "https://gharbazaar-hb8d.onrender.com/api/auth/profile",
+        `${API_BASE_URL}/auth/profile`,
         {
           method: "PUT",
 
@@ -302,7 +303,7 @@ function Profile({
 
     try {
       const response = await fetch(
-        "https://gharbazaar-hb8d.onrender.com/api/auth/change-password",
+        `${API_BASE_URL}/auth/change-password`,
         {
           method: "PUT",
 
@@ -377,7 +378,7 @@ function Profile({
 
     try {
       const response = await fetch(
-        `https://gharbazaar-hb8d.onrender.com/api/properties/${propertyId}`,
+        `${API_BASE_URL}/properties/${propertyId}`,
         {
           method: "DELETE",
 

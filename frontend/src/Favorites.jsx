@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { API_BASE_URL } from "./config";
 
 function Favorites({
   token,
@@ -9,13 +10,18 @@ function Favorites({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
 
       const response = await fetch(
-        "https://gharbazaar-hb8d.onrender.com/api/favorites",
+        `${API_BASE_URL}/favorites`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -33,7 +39,11 @@ function Favorites({
         return;
       }
 
-      setFavorites(data);
+      const validList = Array.isArray(data)
+        ? data.filter((item) => item && typeof item === "object" && item._id)
+        : [];
+
+      setFavorites(validList);
 
     } catch (error) {
       console.log(error);
@@ -44,20 +54,18 @@ function Favorites({
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    if (token) {
-      fetchFavorites();
-    }
-  }, [token]);
+    fetchFavorites();
+  }, [fetchFavorites]);
 
   const handleRemoveFavorite = async (
     propertyId
   ) => {
     try {
       const response = await fetch(
-        `https://gharbazaar-hb8d.onrender.com/api/favorites/${propertyId}`,
+        `${API_BASE_URL}/favorites/${propertyId}`,
         {
           method: "DELETE",
 
@@ -80,7 +88,7 @@ function Favorites({
       setFavorites((currentFavorites) =>
         currentFavorites.filter(
           (property) =>
-            property._id !== propertyId
+            property && property._id !== propertyId
         )
       );
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./Register.css";
+import { API_BASE_URL } from "./config";
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -46,7 +47,7 @@ function Register() {
 
     try {
       const response = await fetch(
-        "https://gharbazaar-hb8d.onrender.com/api/auth/register",
+        `${API_BASE_URL}/auth/register`,
         {
           method: "POST",
 

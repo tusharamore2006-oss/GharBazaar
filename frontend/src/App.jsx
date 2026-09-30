@@ -8,13 +8,62 @@ import Favorites from "./Favorites";
 import Profile from "./Profile";
 import Enquiries from "./Enquiries";
 
+import { API_BASE_URL } from "./config";
+import EMICalculator from "./EMICalculator";
 import "./App.css";
 
 // ========================================
 // API URL
 // ========================================
 
-const API_URL = "https://gharbazaar-hb8d.onrender.com/api";
+const API_URL = API_BASE_URL;
+
+// Normalize image data from both old and new property formats.
+const getPropertyImages = (property) => {
+  if (!property) return [];
+
+  if (Array.isArray(property.images)) {
+    return property.images.filter(
+      (image) => typeof image === "string" && image.trim()
+    );
+  }
+
+  if (Array.isArray(property.imageUrls)) {
+    return property.imageUrls.filter(
+      (image) => typeof image === "string" && image.trim()
+    );
+  }
+
+  if (typeof property.image === "string" && property.image.trim()) {
+    return [property.image];
+  }
+
+  if (typeof property.imageUrl === "string" && property.imageUrl.trim()) {
+    return [property.imageUrl];
+  }
+
+  return [];
+};
+
+// Formats prices in Indian Lakhs/Crores standard (e.g. ₹85 Lakh, ₹1.5 Cr, ₹25,000/mo)
+const formatPrice = (price, listingType) => {
+  if (price === undefined || price === null || price === "") return "";
+  const num = Number(price);
+  if (isNaN(num)) return `₹${price}`;
+
+  if (listingType === "Rent") {
+    return `₹${num.toLocaleString("en-IN")}/mo`;
+  }
+  if (num >= 10000000) {
+    const cr = (num / 10000000).toFixed(2).replace(/\.00$/, "");
+    return `₹${cr} Cr`;
+  }
+  if (num >= 100000) {
+    const lakh = (num / 100000).toFixed(2).replace(/\.00$/, "");
+    return `₹${lakh} Lakh`;
+  }
+  return `₹${num.toLocaleString("en-IN")}`;
+};
 
 // ========================================
 // APP
@@ -160,6 +209,11 @@ function App() {
     maxPrice,
     setMaxPrice,
   ] = useState("");
+
+  const [
+    sortBy,
+    setSortBy,
+  ] = useState("newest");
 
   // ======================================
   // NOTIFICATIONS
@@ -1206,13 +1260,7 @@ function App() {
     setEditingProperty({
       ...property,
 
-      images: Array.isArray(
-        property.images
-      )
-        ? [
-            ...property.images,
-          ]
-        : [],
+      images: getPropertyImages(property),
     });
 
     setPage(
@@ -1262,6 +1310,83 @@ function App() {
         ),
       })
     );
+  };
+
+  // ======================================
+  // REPLACE (CHANGE) ONE EDIT IMAGE
+  // ======================================
+
+  const handleReplaceEditImage = async (
+    event,
+    imageIndex
+  ) => {
+    const file =
+      event.target.files &&
+      event.target.files[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!token) {
+      alert("Please login again.");
+      return;
+    }
+
+    try {
+      setUploadingEditImages(true);
+
+      const formData = new FormData();
+
+      formData.append("image", file);
+
+      const response = await fetch(
+        `${API_URL}/upload/single`,
+        {
+          method: "POST",
+
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(
+          data.message ||
+            `Unable to replace ${file.name}`
+        );
+
+        return;
+      }
+
+      if (data.imageUrl) {
+        setEditingProperty((current) => {
+          const images = [
+            ...(current.images || []),
+          ];
+
+          images[imageIndex] = data.imageUrl;
+
+          return {
+            ...current,
+            images,
+          };
+        });
+      }
+    } catch (error) {
+      console.log(error);
+
+      alert("Unable to upload image");
+    } finally {
+      setUploadingEditImages(false);
+
+      event.target.value = "";
+    }
   };
 
   // ======================================
@@ -1455,8 +1580,13 @@ function App() {
                   editingProperty.status,
 
                 images:
-                  editingProperty.images ||
-                  [],
+                  getPropertyImages(editingProperty),
+
+                // Keep compatibility with older property records
+                // that stored only one image field.
+                image:
+                  getPropertyImages(editingProperty)[0] ||
+                  "",
               }),
             }
           );
@@ -1528,19 +1658,12 @@ function App() {
   // ======================================
 
   const clearSearch = () => {
-
     setSearchInput("");
-
     setSearchLocation("");
-
-    setPropertyTypeFilter(
-      "All"
-    );
-
+    setPropertyTypeFilter("All");
     setMinPrice("");
-
     setMaxPrice("");
-
+    setSortBy("newest");
     setSearchType("Buy");
   };
 
@@ -1548,135 +1671,70 @@ function App() {
   // FILTER PROPERTIES
   // ======================================
 
-  const filteredProperties =
-    properties.filter(
-      (property) => {
-
-        // BUY / RENT
-
-        if (
-          searchType === "Rent" &&
-          property.listingType !==
-            "Rent"
-        ) {
-          return false;
-        }
-
-        if (
-          searchType === "Buy" &&
-          property.listingType !==
-            "Sale"
-        ) {
-          return false;
-        }
-
-        // PROPERTY TYPE
-
-        if (
-          propertyTypeFilter !==
-            "All" &&
-          property.propertyType !==
-            propertyTypeFilter
-        ) {
-          return false;
-        }
-
-        // LOCATION
-
-        if (
-          searchLocation.trim() !==
-          ""
-        ) {
-
-          const location =
-            property.location
-              ?.toLowerCase() ||
-            "";
-
-          if (
-            !location.includes(
-              searchLocation
-                .toLowerCase()
-                .trim()
-            )
-          ) {
-            return false;
-          }
-        }
-
-        // SEARCH TEXT
-
-        if (
-          searchInput.trim() !==
-          ""
-        ) {
-
-          const search =
-            searchInput
-              .toLowerCase()
-              .trim();
-
-          const title =
-            property.title
-              ?.toLowerCase() ||
-            "";
-
-          const description =
-            property.description
-              ?.toLowerCase() ||
-            "";
-
-          const location =
-            property.location
-              ?.toLowerCase() ||
-            "";
-
-          if (
-            !title.includes(
-              search
-            ) &&
-            !description.includes(
-              search
-            ) &&
-            !location.includes(
-              search
-            )
-          ) {
-            return false;
-          }
-        }
-
-        // MIN PRICE
-
-        if (
-          minPrice !== "" &&
-          Number(
-            property.price
-          ) <
-            Number(
-              minPrice
-            )
-        ) {
-          return false;
-        }
-
-        // MAX PRICE
-
-        if (
-          maxPrice !== "" &&
-          Number(
-            property.price
-          ) >
-            Number(
-              maxPrice
-            )
-        ) {
-          return false;
-        }
-
-        return true;
+  const filteredProperties = properties
+    .filter((property) => {
+      // BUY / RENT
+      if (searchType === "Rent" && property.listingType !== "Rent") {
+        return false;
       }
-    );
+
+      if (searchType === "Buy" && property.listingType !== "Sale") {
+        return false;
+      }
+
+      // PROPERTY TYPE
+      if (
+        propertyTypeFilter !== "All" &&
+        property.propertyType !== propertyTypeFilter
+      ) {
+        return false;
+      }
+
+      // LOCATION
+      if (searchLocation.trim() !== "") {
+        const location = property.location?.toLowerCase() || "";
+        if (!location.includes(searchLocation.toLowerCase().trim())) {
+          return false;
+        }
+      }
+
+      // SEARCH TEXT
+      if (searchInput.trim() !== "") {
+        const search = searchInput.toLowerCase().trim();
+        const title = property.title?.toLowerCase() || "";
+        const description = property.description?.toLowerCase() || "";
+        const location = property.location?.toLowerCase() || "";
+
+        if (
+          !title.includes(search) &&
+          !description.includes(search) &&
+          !location.includes(search)
+        ) {
+          return false;
+        }
+      }
+
+      // MIN PRICE
+      if (minPrice !== "" && Number(property.price) < Number(minPrice)) {
+        return false;
+      }
+
+      // MAX PRICE
+      if (maxPrice !== "" && Number(property.price) > Number(maxPrice)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "price-asc") {
+        return Number(a.price || 0) - Number(b.price || 0);
+      }
+      if (sortBy === "price-desc") {
+        return Number(b.price || 0) - Number(a.price || 0);
+      }
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
 
   // ======================================
   // LOGIN PAGE
@@ -2160,6 +2218,55 @@ function App() {
                       >
                         Photo{" "}
                         {index + 1}
+
+                        <label
+                          title="Change this photo"
+                          style={{
+                            display:
+                              "block",
+                            marginTop:
+                              "7px",
+                            padding:
+                              "5px 9px",
+                            background:
+                              uploadingEditImages
+                                ? "#999"
+                                : "#14786b",
+                            color:
+                              "white",
+                            borderRadius:
+                              "6px",
+                            fontSize:
+                              "12px",
+                            fontWeight:
+                              "600",
+                            cursor:
+                              uploadingEditImages
+                                ? "not-allowed"
+                                : "pointer",
+                          }}
+                        >
+                          🔄 Change
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={(
+                              event
+                            ) =>
+                              handleReplaceEditImage(
+                                event,
+                                index
+                              )
+                            }
+                            disabled={
+                              uploadingEditImages
+                            }
+                            style={{
+                              display:
+                                "none",
+                            }}
+                          />
+                        </label>
                       </div>
 
                     </div>
@@ -2465,6 +2572,78 @@ function App() {
   }
 
   // ======================================
+  // HOME LOAN & EMI CALCULATOR PAGE
+  // ======================================
+
+  if (page === "emi-calculator") {
+    return (
+      <div className="app">
+        <nav className="navbar">
+          <div
+            className="navbar-brand"
+            onClick={handleHome}
+            style={{ cursor: "pointer" }}
+          >
+            <span className="brand-icon">🏠</span>
+            <span className="brand-text">Ghar<span>Bazaar</span></span>
+          </div>
+
+          <div className="navbar-links">
+            <button
+              type="button"
+              className="nav-link-btn"
+              onClick={handleHome}
+            >
+              ← Back to Listings
+            </button>
+            <button
+              type="button"
+              className="nav-link-btn"
+              onClick={() => {
+                setSearchType("Buy");
+                handleHome();
+              }}
+            >
+              Buy
+            </button>
+            <button
+              type="button"
+              className="nav-link-btn"
+              onClick={() => {
+                setSearchType("Rent");
+                handleHome();
+              }}
+            >
+              Rent
+            </button>
+          </div>
+        </nav>
+
+        <main style={{ maxWidth: "1200px", margin: "40px auto 60px", padding: "0 20px" }}>
+          <button
+            type="button"
+            className="details-back-button"
+            onClick={handleHome}
+            style={{ marginBottom: "25px" }}
+          >
+            ← Back to Home
+          </button>
+          <EMICalculator />
+        </main>
+
+        <footer className="site-footer">
+          <div className="footer-container">
+            <div className="footer-bottom-bar">
+              <p>© 2026 GharBazaar. All rights reserved.</p>
+              <p className="developer-tag">Designed & Built for Indian Homeowners</p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // ======================================
   // HOME PAGE
   // ======================================
 
@@ -2476,47 +2655,22 @@ function App() {
       ================================== */}
 
       <nav className="navbar">
-
         <div
-          className="navbar-logo"
-          onClick={
-            handleHome
-          }
-          style={{
-            cursor: "pointer",
-          }}
+          className="navbar-brand"
+          onClick={handleHome}
+          style={{ cursor: "pointer" }}
         >
-          🏠 GharBazaar
+          <span className="brand-icon">🏠</span>
+          <span className="brand-text">Ghar<span>Bazaar</span></span>
         </div>
 
         <div className="navbar-links">
-
           <button
             type="button"
-            onClick={
-              handleHome
-            }
-          >
-            Home
-          </button>
-
-          <button
-            type="button"
+            className={`nav-link-btn ${page === "home" && searchType === "Buy" ? "active" : ""}`}
             onClick={() => {
-
-              setSearchType(
-                "Buy"
-              );
-
-              setPage(
-                "home"
-              );
-
-              window.history.pushState(
-                {},
-                "",
-                "/"
-              );
+              setSearchType("Buy");
+              handleHome();
             }}
           >
             Buy
@@ -2524,73 +2678,70 @@ function App() {
 
           <button
             type="button"
+            className={`nav-link-btn ${page === "home" && searchType === "Rent" ? "active" : ""}`}
             onClick={() => {
-
-              setSearchType(
-                "Rent"
-              );
-
-              setPage(
-                "home"
-              );
-
-              window.history.pushState(
-                {},
-                "",
-                "/"
-              );
+              setSearchType("Rent");
+              handleHome();
             }}
           >
             Rent
           </button>
 
+          <button
+            type="button"
+            className={`nav-link-btn ${page === "emi-calculator" ? "active" : ""}`}
+            onClick={() => {
+              if (page === "home") {
+                const el = document.getElementById("emi-calculator-section");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth" });
+                  return;
+                }
+              }
+              setPage("emi-calculator");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          >
+            💰 Home Loans
+          </button>
+
           {token && (
             <button
               type="button"
-              onClick={() =>
-                setPage(
-                  "add-property"
-                )
-              }
+              className="nav-btn-list"
+              onClick={() => setPage("add-property")}
             >
-              Sell Property
+              + List Property
             </button>
           )}
 
           {token && (
             <button
               type="button"
-              onClick={
-                openEnquiries
-              }
+              className={`nav-link-btn ${page === "enquiries" ? "active" : ""}`}
+              onClick={openEnquiries}
             >
-              📩 Enquiries
+              📩 Inquiries
             </button>
           )}
 
           {token && (
             <button
               type="button"
-              onClick={() =>
-                setPage(
-                  "favorites"
-                )
-              }
+              className={`nav-link-btn ${page === "favorites" ? "active" : ""}`}
+              onClick={() => setPage("favorites")}
             >
-              ❤️ My Favorites
+              ❤️ Favorites {favorites.length > 0 && <span className="nav-fav-badge">{favorites.length}</span>}
             </button>
           )}
 
           {token && (
             <button
               type="button"
-              onClick={() =>
-                setPage(
-                  "profile"
-                )
-              }
+              className={`nav-link-btn nav-profile-pill ${page === "profile" ? "active" : ""}`}
+              onClick={() => setPage("profile")}
             >
-              👤 Profile
+              👤 {user?.name ? user.name.split(" ")[0] : "Profile"}
             </button>
           )}
 
@@ -3010,720 +3161,560 @@ function App() {
             </div>
           )}
 
-          {/* USER / LOGIN */}
-
+          {/* USER / AUTH BUTTONS */}
           {token ? (
-            <>
-
-              <span
-                style={{
-                  fontWeight:
-                    "600",
-                  marginLeft:
-                    "10px",
-                }}
-              >
-                👤{" "}
-                {user?.name ||
-                  "User"}
-              </span>
-
-              <button
-                type="button"
-                onClick={
-                  handleLogout
-                }
-              >
-                Logout
-              </button>
-
-            </>
+            <button
+              type="button"
+              className="nav-btn-logout"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
           ) : (
-            <>
-
+            <div className="nav-auth-group">
               <button
                 type="button"
-                onClick={() =>
-                  setPage(
-                    "login"
-                  )
-                }
+                className="nav-btn-login"
+                onClick={() => setPage("login")}
               >
                 Login
               </button>
-
               <button
                 type="button"
-                onClick={() =>
-                  setPage(
-                    "register"
-                  )
-                }
+                className="nav-btn-register"
+                onClick={() => setPage("register")}
               >
-                Register
+                Sign Up
               </button>
-
-            </>
+            </div>
           )}
 
         </div>
       </nav>
 
       {/* ==================================
-          HERO
+          HERO SECTION
       ================================== */}
 
       <section className="hero">
-
+        <div className="hero-overlay" />
         <div className="hero-content">
-
-          <h1>
-            Find Your Dream Home
-          </h1>
-
-          <p>
-            Buy, rent and sell
-            properties with
-            GharBazaar
-          </p>
-
-          <div className="search-box">
-
-            <div className="search-row">
-
-              <select
-                value={
-                  searchType
-                }
-                onChange={(e) =>
-                  setSearchType(
-                    e.target.value
-                  )
-                }
-              >
-
-                <option value="Buy">
-                  Buy
-                </option>
-
-                <option value="Rent">
-                  Rent
-                </option>
-
-              </select>
-
-              <input
-                type="text"
-                placeholder="Search property"
-                value={
-                  searchInput
-                }
-                onChange={(e) =>
-                  setSearchInput(
-                    e.target.value
-                  )
-                }
-              />
-
-              <input
-                type="text"
-                placeholder="Location"
-                value={
-                  searchLocation
-                }
-                onChange={(e) =>
-                  setSearchLocation(
-                    e.target.value
-                  )
-                }
-              />
-
-              <button
-                type="button"
-                onClick={
-                  handleSearch
-                }
-              >
-                Search
-              </button>
-
-            </div>
-
-            <div className="filter-row">
-
-              <select
-                value={
-                  propertyTypeFilter
-                }
-                onChange={(e) =>
-                  setPropertyTypeFilter(
-                    e.target.value
-                  )
-                }
-              >
-
-                <option value="All">
-                  All Property Types
-                </option>
-
-                <option value="House">
-                  House
-                </option>
-
-                <option value="Flat">
-                  Flat
-                </option>
-
-                <option value="Villa">
-                  Villa
-                </option>
-
-                <option value="Plot">
-                  Plot
-                </option>
-
-              </select>
-
-              <input
-                type="number"
-                placeholder="Min Price"
-                value={
-                  minPrice
-                }
-                onChange={(e) =>
-                  setMinPrice(
-                    e.target.value
-                  )
-                }
-              />
-
-              <input
-                type="number"
-                placeholder="Max Price"
-                value={
-                  maxPrice
-                }
-                onChange={(e) =>
-                  setMaxPrice(
-                    e.target.value
-                  )
-                }
-              />
-
-              <button
-                type="button"
-                onClick={
-                  clearSearch
-                }
-              >
-                Clear
-              </button>
-
-            </div>
-
+          <div className="hero-badge">
+            <span className="badge-sparkle">✨</span> India's Premier Property Marketplace
           </div>
 
-        </div>
+          <h1 className="hero-title">
+            Find Your Perfect <span>Sanctuary</span>
+          </h1>
 
+          <p className="hero-subtitle">
+            Explore verified apartments, independent houses, luxury villas, and plots with transparent pricing and direct owner connections.
+          </p>
+
+          {/* FLOATING SEARCH CARD */}
+          <div className="hero-search-card">
+            {/* TABS: BUY / RENT */}
+            <div className="search-mode-tabs">
+              <button
+                type="button"
+                className={`mode-tab ${searchType === "Buy" ? "active" : ""}`}
+                onClick={() => setSearchType("Buy")}
+              >
+                <span className="tab-icon">🏠</span> Buy Property
+              </button>
+              <button
+                type="button"
+                className={`mode-tab ${searchType === "Rent" ? "active" : ""}`}
+                onClick={() => setSearchType("Rent")}
+              >
+                <span className="tab-icon">🔑</span> Rent Home
+              </button>
+            </div>
+
+            {/* UNIFIED HORIZONTAL SEARCH BAR */}
+            <div className="search-inputs-bar">
+              {/* Location Input */}
+              <div className="search-field field-location">
+                <span className="field-icon">📍</span>
+                <div className="field-inner">
+                  <label htmlFor="hero-search-location">Location</label>
+                  <input
+                    id="hero-search-location"
+                    type="text"
+                    placeholder="City, locality or landmark"
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="field-divider" />
+
+              {/* Keyword / Title Input */}
+              <div className="search-field field-keyword">
+                <span className="field-icon">🔍</span>
+                <div className="field-inner">
+                  <label htmlFor="hero-search-keyword">Keyword</label>
+                  <input
+                    id="hero-search-keyword"
+                    type="text"
+                    placeholder="e.g. 3 BHK, Sea View, Furnished"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="field-divider" />
+
+              {/* Property Type Dropdown */}
+              <div className="search-field field-type">
+                <span className="field-icon">🏘️</span>
+                <div className="field-inner">
+                  <label htmlFor="hero-property-type">Property Type</label>
+                  <select
+                    id="hero-property-type"
+                    value={propertyTypeFilter}
+                    onChange={(e) => setPropertyTypeFilter(e.target.value)}
+                  >
+                    <option value="All">All Types</option>
+                    <option value="House">House</option>
+                    <option value="Flat">Apartment / Flat</option>
+                    <option value="Villa">Villa</option>
+                    <option value="Plot">Plot</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Search Actions */}
+              <div className="search-btn-wrapper">
+                <button
+                  type="button"
+                  className="hero-search-btn"
+                  onClick={handleSearch}
+                >
+                  <span>Search</span>
+                </button>
+                {(searchLocation || searchInput || propertyTypeFilter !== "All" || minPrice || maxPrice) && (
+                  <button
+                    type="button"
+                    className="hero-clear-btn"
+                    onClick={clearSearch}
+                    title="Reset all filters"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ==================================
-          PROPERTIES
+          TRUST & STATS STRIP
+      ================================== */}
+      <section className="trust-strip">
+        <div className="trust-container">
+          <div className="trust-item">
+            <span className="trust-icon">🏠</span>
+            <div className="trust-info">
+              <h4>1,500+ Verified Homes</h4>
+              <p>Curated listings updated daily</p>
+            </div>
+          </div>
+          <div className="trust-item">
+            <span className="trust-icon">🛡️</span>
+            <div className="trust-info">
+              <h4>Direct Owner Connect</h4>
+              <p>Zero fake brokers or surprises</p>
+            </div>
+          </div>
+          <div className="trust-item">
+            <span className="trust-icon">💬</span>
+            <div className="trust-info">
+              <h4>Instant Inquiries</h4>
+              <p>Chat directly with sellers</p>
+            </div>
+          </div>
+          <div className="trust-item">
+            <span className="trust-icon">⭐</span>
+            <div className="trust-info">
+              <h4>100% Free to Search</h4>
+              <p>Transparent pricing, no hidden fees</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ==================================
+          PROPERTIES SECTION
       ================================== */}
 
-      <section
-        className="properties-section"
-      >
+      <section className="properties-section" id="listings">
+        <div className="properties-container">
 
-        <div
-          className="properties-container"
-        >
+          {/* QUICK CATEGORY CHIPS */}
+          <div className="category-chips-bar">
+            {[
+              { id: "All", label: "All Properties", icon: "✨" },
+              { id: "Flat", label: "Apartments", icon: "🏢" },
+              { id: "House", label: "Houses", icon: "🏡" },
+              { id: "Villa", label: "Luxury Villas", icon: "🏰" },
+              { id: "Plot", label: "Plots & Land", icon: "📐" },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                className={`category-pill ${propertyTypeFilter === cat.id ? "active" : ""}`}
+                onClick={() => setPropertyTypeFilter(cat.id)}
+              >
+                <span className="pill-icon">{cat.icon}</span>
+                <span className="pill-label">{cat.label}</span>
+              </button>
+            ))}
+          </div>
 
-          <div
-            className="section-heading"
-          >
+          {/* DEDICATED LISTINGS TOOLBAR (WELL-DESERVED PLACE) */}
+          <div className="listings-toolbar">
+            <div className="toolbar-title-block">
+              <h2>
+                {searchType === "Rent"
+                  ? "Properties for Rent"
+                  : "Properties for Sale"}
+              </h2>
+              <span className="results-count-chip">
+                {filteredProperties.length}{" "}
+                {filteredProperties.length === 1 ? "Listing" : "Listings"} Available
+              </span>
+            </div>
 
-            <h2>
-              {searchType ===
-              "Rent"
-                ? "Properties for Rent"
-                : "Properties for Sale"}
-            </h2>
+            <div className="toolbar-controls">
+              {/* Budget Range Inputs */}
+              <div className="price-filter-group">
+                <span className="filter-label">Budget:</span>
+                <input
+                  type="number"
+                  placeholder="Min ₹"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                  className="price-input"
+                />
+                <span className="price-separator">-</span>
+                <input
+                  type="number"
+                  placeholder="Max ₹"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="price-input"
+                />
+              </div>
 
-            <p>
-              {
-                filteredProperties.length
-              }{" "}
-              properties found
-            </p>
+              {/* Sort By Dropdown */}
+              <div className="sort-group">
+                <span className="filter-label">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="sort-dropdown"
+                >
+                  <option value="newest">Latest Listed</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                </select>
+              </div>
 
+              {(searchLocation || searchInput || propertyTypeFilter !== "All" || minPrice || maxPrice) && (
+                <button
+                  type="button"
+                  className="btn-reset-filters"
+                  onClick={clearSearch}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
 
           {loading && (
-            <div
-              style={{
-                textAlign:
-                  "center",
-                padding:
-                  "40px",
-              }}
-            >
-              <p>
-                Loading properties...
-              </p>
+            <div className="properties-state-box">
+              <div className="state-spinner" />
+              <p>Discovering verified properties...</p>
             </div>
           )}
 
-          {!loading &&
-            error && (
-              <div
-                style={{
-                  textAlign:
-                    "center",
-                  padding:
-                    "40px",
-                  color:
-                    "red",
-                }}
+          {!loading && error && (
+            <div className="properties-state-box error">
+              <p>{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && filteredProperties.length === 0 && (
+            <div className="properties-state-box empty">
+              <div className="empty-icon">🔍</div>
+              <h3>No properties match your criteria</h3>
+              <p>Try widening your search location, clearing price filters, or switching property types.</p>
+              <button
+                type="button"
+                className="btn-reset-large"
+                onClick={clearSearch}
               >
-                <p>
-                  {error}
-                </p>
-              </div>
-            )}
+                Clear All Filters
+              </button>
+            </div>
+          )}
 
-          {!loading &&
-            !error &&
-            filteredProperties.length ===
-              0 && (
-              <div
-                style={{
-                  textAlign:
-                    "center",
-                  padding:
-                    "50px",
-                }}
-              >
+          {!loading && !error && filteredProperties.length > 0 && (
+            <div className="property-grid">
+              {filteredProperties.map((property) => {
+                const propertyIsFavorite = isFavorite(property._id);
+                const propertyImages = getPropertyImages(property);
+                const mainImage = propertyImages.length > 0 ? propertyImages[0] : null;
 
-                <h3>
-                  No properties found
-                </h3>
-
-                <p>
-                  Try changing
-                  your search or
-                  filters.
-                </p>
-
-              </div>
-            )}
-
-          {!loading &&
-            !error &&
-            filteredProperties.length >
-              0 && (
-
-              <div
-                className="property-grid"
-              >
-
-                {filteredProperties.map(
-                  (
-                    property
-                  ) => {
-
-                    const propertyIsFavorite =
-                      isFavorite(
-                        property._id
-                      );
-
-                    return (
-
-                      <div
-                        className="property-card"
-                        key={
-                          property._id
-                        }
-                        onClick={() => {
-
-                          openPropertyDetails(
-                            property._id
-                          );
-                        }}
-                        style={{
-                          cursor:
-                            "pointer",
-                        }}
-                      >
-
-                        <div
-                          className="property-image"
-                        >
-
-                          {property.images &&
-                          property.images.length >
-                            0 ? (
-
-                            <>
-
-                              <img
-                                src={
-                                  property
-                                    .images[0]
-                                }
-                                alt={
-                                  property.title
-                                }
-                              />
-
-                              {property.images.length >
-                                1 && (
-
-                                <span className="property-photo-count">
-
-                                  📸{" "}
-
-                                  {
-                                    property
-                                      .images
-                                      .length
-                                  }
-
-                                </span>
-                              )}
-
-                            </>
-
-                          ) : (
-
-                            <div className="property-image-placeholder">
-                              🏠
-                            </div>
-                          )}
-
+                return (
+                  <div
+                    className="property-card"
+                    key={property._id}
+                    onClick={() => openPropertyDetails(property._id)}
+                  >
+                    {/* CARD MEDIA HEADER */}
+                    <div className="card-media">
+                      {mainImage ? (
+                        <img
+                          src={mainImage}
+                          alt={property.title}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="card-no-image">
+                          <span>🏠</span>
                         </div>
+                      )}
 
-                        <div
-                          className="property-content"
-                        >
-
-                          <span
-                            className="property-listing-type"
-                          >
-                            {property.listingType ===
-                            "Rent"
-                              ? "For Rent"
-                              : "For Sale"}
+                      {/* Top Badges */}
+                      <div className="media-badge-tags">
+                        <span className={`pill-badge ${property.listingType === "Rent" ? "rent" : "sale"}`}>
+                          {property.listingType === "Rent" ? "FOR RENT" : "FOR SALE"}
+                        </span>
+                        {property.status && (
+                          <span className={`pill-badge status ${property.status === "Sold" ? "sold" : "available"}`}>
+                            {property.status === "Sold" ? "Sold" : "Available"}
                           </span>
-
-                          <h3>
-                            {
-                              property.title
-                            }
-                          </h3>
-
-                          <p
-                            className="property-location"
-                          >
-                            📍{" "}
-                            {
-                              property.location
-                            }
-                          </p>
-
-                          <p>
-                            🏠{" "}
-                            {
-                              property.propertyType
-                            }
-                          </p>
-
-                          <div
-                            className="property-features"
-                          >
-
-                            <span>
-                              🛏️{" "}
-                              {
-                                property.bedrooms
-                              }
-                            </span>
-
-                            <span>
-                              🛁{" "}
-                              {
-                                property.bathrooms
-                              }
-                            </span>
-
-                            <span>
-                              📐{" "}
-                              {
-                                property.area
-                              }{" "}
-                              sq.ft
-                            </span>
-
-                          </div>
-
-                          <h4
-                            className="property-price"
-                          >
-
-                            ₹
-                            {Number(
-                              property.price
-                            ).toLocaleString(
-                              "en-IN"
-                            )}
-
-                            {property.listingType ===
-                            "Rent"
-                              ? " / month"
-                              : ""}
-
-                          </h4>
-
-                          <button
-                            type="button"
-                            onClick={(e) =>
-                              handleFavorite(
-                                e,
-                                property._id
-                              )
-                            }
-                            style={{
-                              marginTop:
-                                "12px",
-
-                              marginRight:
-                                "8px",
-
-                              padding:
-                                "9px 14px",
-
-                              border:
-                                "1px solid #14786b",
-
-                              borderRadius:
-                                "7px",
-
-                              background:
-                                propertyIsFavorite
-                                  ? "#14786b"
-                                  : "white",
-
-                              color:
-                                propertyIsFavorite
-                                  ? "white"
-                                  : "#14786b",
-
-                              cursor:
-                                "pointer",
-
-                              fontWeight:
-                                "600",
-                            }}
-                          >
-
-                            {propertyIsFavorite
-                              ? "❤️ Favorited"
-                              : "🤍 Favorite"}
-
-                          </button>
-
-                          {isPropertyOwner(
-                            property
-                          ) && (
-
-                            <div
-                              style={{
-                                marginTop:
-                                  "10px",
-                              }}
-                            >
-
-                              <button
-                                type="button"
-                                onClick={(
-                                  e
-                                ) => {
-
-                                  e.stopPropagation();
-
-                                  handleEdit(
-                                    property
-                                  );
-                                }}
-                                style={{
-                                  marginRight:
-                                    "8px",
-
-                                  padding:
-                                    "8px 12px",
-
-                                  border:
-                                    "1px solid #14786b",
-
-                                  borderRadius:
-                                    "6px",
-
-                                  background:
-                                    "white",
-
-                                  color:
-                                    "#14786b",
-
-                                  cursor:
-                                    "pointer",
-
-                                  fontWeight:
-                                    "600",
-                                }}
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(
-                                  e
-                                ) => {
-
-                                  e.stopPropagation();
-
-                                  handleDelete(
-                                    property._id
-                                  );
-                                }}
-                                style={{
-                                  padding:
-                                    "8px 12px",
-
-                                  border:
-                                    "1px solid #d9534f",
-
-                                  borderRadius:
-                                    "6px",
-
-                                  background:
-                                    "white",
-
-                                  color:
-                                    "#d9534f",
-
-                                  cursor:
-                                    "pointer",
-
-                                  fontWeight:
-                                    "600",
-                                }}
-                              >
-                                Delete
-                              </button>
-
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-
-                              e.stopPropagation();
-
-                              openPropertyDetails(
-                                property._id
-                              );
-                            }}
-                            style={{
-                              marginTop:
-                                "12px",
-
-                              width:
-                                "100%",
-
-                              padding:
-                                "10px",
-
-                              border:
-                                "none",
-
-                              borderRadius:
-                                "7px",
-
-                              background:
-                                "#14786b",
-
-                              color:
-                                "white",
-
-                              cursor:
-                                "pointer",
-
-                              fontWeight:
-                                "600",
-                            }}
-                          >
-                            View Details
-                          </button>
-
-                        </div>
-
+                        )}
                       </div>
-                    );
-                  }
-                )}
 
-              </div>
-            )}
+                      {/* Photo Count */}
+                      {propertyImages.length > 1 && (
+                        <span className="photo-count-pill">
+                          📷 {propertyImages.length}
+                        </span>
+                      )}
+
+                      {/* Heart Favorite Button */}
+                      <button
+                        type="button"
+                        className={`card-favorite-btn ${propertyIsFavorite ? "active" : ""}`}
+                        onClick={(e) => handleFavorite(e, property._id)}
+                        title={propertyIsFavorite ? "Remove from favorites" : "Save to favorites"}
+                      >
+                        {propertyIsFavorite ? "❤️" : "🤍"}
+                      </button>
+                    </div>
+
+                    {/* CARD BODY */}
+                    <div className="card-body">
+                      <div className="card-price-row">
+                        <h3 className="card-price">
+                          {formatPrice(property.price, property.listingType)}
+                        </h3>
+                        <span className="card-type-chip">{property.propertyType}</span>
+                      </div>
+
+                      <h4 className="card-title" title={property.title}>
+                        {property.title}
+                      </h4>
+
+                      <p className="card-location">
+                        <span className="location-pin">📍</span> {property.location}
+                      </p>
+
+                      {/* SPECS ROW */}
+                      <div className="card-specs">
+                        {property.bedrooms > 0 && (
+                          <span className="spec-item">
+                            🛏️ {property.bedrooms} {property.bedrooms === 1 ? "Bed" : "Beds"}
+                          </span>
+                        )}
+                        {property.bathrooms > 0 && (
+                          <span className="spec-item">
+                            🚿 {property.bathrooms} {property.bathrooms === 1 ? "Bath" : "Baths"}
+                          </span>
+                        )}
+                        {property.area > 0 && (
+                          <span className="spec-item">
+                            📐 {Number(property.area).toLocaleString("en-IN")} sq.ft
+                          </span>
+                        )}
+                        {property.furnished && (
+                          <span className="spec-item spec-furnished">
+                            🛋️ {property.furnished}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* OWNER ACTIONS IF OWNED */}
+                      {isPropertyOwner(property) && (
+                        <div className="card-owner-bar">
+                          <button
+                            type="button"
+                            className="btn-owner-edit"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(property);
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-owner-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(property._id);
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      )}
+
+                      {/* CARD ACTIONS */}
+                      <div className="card-actions">
+                        <button
+                          type="button"
+                          className="btn-view-details"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPropertyDetails(property._id);
+                          }}
+                        >
+                          View Details →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
         </div>
-
       </section>
 
       {/* ==================================
-          FOOTER
+          HOME LOAN & EMI CALCULATOR SECTION
       ================================== */}
-
-      <footer
-        className="app-footer"
+      <section
+        id="emi-calculator-section"
+        className="home-emi-section"
         style={{
-          marginTop:
-            "50px",
-
-          padding:
-            "25px",
-
-          textAlign:
-            "center",
-
-          background:
-            "#f5f5f5",
-
-          color:
-            "#666",
+          background: "#f8fafc",
+          borderTop: "1px solid #e2e8f0",
+          borderBottom: "1px solid #e2e8f0",
+          padding: "60px 20px 80px",
         }}
       >
+        <EMICalculator />
+      </section>
 
-        <div>
-          © 2026 GharBazaar. All rights reserved.
+      {/* ==================================
+          PROFESSIONAL FOOTER
+      ================================== */}
+
+      <footer className="site-footer">
+        <div className="footer-container">
+          <div className="footer-grid">
+            <div className="footer-col brand-col">
+              <div className="footer-logo">
+                <span className="footer-logo-icon">🏠</span> Ghar<span>Bazaar</span>
+              </div>
+              <p className="footer-desc">
+                India's trusted digital marketplace to buy, rent, and sell verified residential and commercial properties with 100% direct owner contact and transparent pricing.
+              </p>
+              <div className="footer-trust-tags">
+                <span className="trust-tag">🛡️ 100% Verified</span>
+                <span className="trust-tag">⚡ Zero Hidden Brokerage</span>
+              </div>
+            </div>
+
+            <div className="footer-col">
+              <h4>Quick Links</h4>
+              <ul>
+                <li><button type="button" onClick={handleHome}>Home</button></li>
+                <li><button type="button" onClick={() => { setSearchType("Buy"); handleHome(); }}>Buy Properties</button></li>
+                <li><button type="button" onClick={() => { setSearchType("Rent"); handleHome(); }}>Rent Properties</button></li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById("emi-calculator-section");
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth" });
+                      } else {
+                        setPage("emi-calculator");
+                      }
+                    }}
+                  >
+                    Home Loan & EMI Calculator
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const el = document.getElementById("emi-calculator-section");
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth" });
+                      } else {
+                        setPage("emi-calculator");
+                      }
+                    }}
+                  >
+                    Partner Bank Loan Rates
+                  </button>
+                </li>
+                {token && <li><button type="button" onClick={() => setPage("add-property")}>+ Post Property</button></li>}
+                {token && <li><button type="button" onClick={() => setPage("favorites")}>Saved Favorites</button></li>}
+                {token && <li><button type="button" onClick={openEnquiries}>My Inquiries</button></li>}
+              </ul>
+            </div>
+
+            <div className="footer-col">
+              <h4>Property Types</h4>
+              <ul>
+                <li><button type="button" onClick={() => { setPropertyTypeFilter("Flat"); handleHome(); }}>Apartments & Flats</button></li>
+                <li><button type="button" onClick={() => { setPropertyTypeFilter("House"); handleHome(); }}>Independent Houses</button></li>
+                <li><button type="button" onClick={() => { setPropertyTypeFilter("Villa"); handleHome(); }}>Luxury Villas</button></li>
+                <li><button type="button" onClick={() => { setPropertyTypeFilter("Plot"); handleHome(); }}>Residential Plots</button></li>
+              </ul>
+            </div>
+
+            <div className="footer-col contact-col">
+              <h4>Direct Support</h4>
+              <p className="footer-contact-item">📧 contact@gharbazaar.in</p>
+              <p className="footer-contact-item">📞 +91 98765 43210</p>
+              <p className="footer-contact-item">📍 Mumbai, Maharashtra, India</p>
+              <div className="footer-secure-badge">
+                🔒 SSL Encrypted & Secure
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-bottom-bar">
+            <p>© 2026 GharBazaar. All rights reserved.</p>
+            <p className="developer-tag">Designed & Built for Indian Homeowners</p>
+          </div>
         </div>
-
-        <div
-          style={{
-            marginTop:
-              "6px",
-
-            color:
-              "#222",
-
-            fontWeight:
-              "600",
-          }}
-        >
-          Developed by Shreyash Bunjkar
-        </div>
-
       </footer>
 
     </div>

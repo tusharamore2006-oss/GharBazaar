@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import "./PropertyDetails.css";
+import { API_BASE_URL } from "./config";
+import EMICalculator from "./EMICalculator";
 
-const API_URL = "https://gharbazaar-hb8d.onrender.com/api";
+const API_URL = API_BASE_URL;
 
 function PropertyDetails({
   propertyId,
@@ -945,6 +947,17 @@ function PropertyDetails({
           </div>
 
         </div>
+
+        {/* ================================
+            HOME LOAN & EMI CALCULATOR
+        ================================= */}
+        <section className="property-loan-calculator-section" style={{ marginTop: "35px" }}>
+          <EMICalculator
+            initialPrice={property.price}
+            propertyTitle={property.title}
+            embedded={true}
+          />
+        </section>
 
         {/* ================================
             SIMILAR PROPERTIES

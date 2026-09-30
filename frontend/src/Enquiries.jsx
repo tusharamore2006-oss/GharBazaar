@@ -1,12 +1,30 @@
 import React, {
   useEffect,
   useState,
+  useCallback,
 } from "react";
 
 import "./Enquiries.css";
+import { API_BASE_URL } from "./config";
 
-const API_URL =
-  "https://gharbazaar-hb8d.onrender.com";
+const API_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const EmptyState = ({
+  title,
+  message,
+}) => (
+  <div className="enquiries-empty">
+    <div className="empty-icon">
+      💬
+    </div>
+    <h3>
+      {title}
+    </h3>
+    <p>
+      {message}
+    </p>
+  </div>
+);
 
 const Enquiries = ({
   onViewDetails,
@@ -88,215 +106,129 @@ const Enquiries = ({
   // FETCH RECEIVED ENQUIRIES
   // ========================================
 
-  const fetchReceivedEnquiries =
-    async () => {
+  const fetchReceivedEnquiries = useCallback(async () => {
+    if (!token) {
+      return;
+    }
 
-      if (!token) {
-        return;
-      }
-
-      try {
-
-        const response =
-          await fetch(
-            `${API_URL}/api/enquiries/seller`,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (response.ok) {
-
-          setReceivedEnquiries(
-            Array.isArray(data)
-              ? data
-              : []
-          );
-
-        } else {
-
-          console.log(
-            "RECEIVED ENQUIRIES ERROR:",
-            data.message
-          );
-
+    try {
+      const response = await fetch(
+        `${API_URL}/api/enquiries/seller`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
 
-      } catch (error) {
+      const data = await response.json();
 
-        console.log(
-          "FETCH RECEIVED ENQUIRIES ERROR:",
-          error
-        );
-
+      if (response.ok) {
+        setReceivedEnquiries(Array.isArray(data) ? data : []);
+      } else {
+        console.log("RECEIVED ENQUIRIES ERROR:", data.message);
       }
-    };
+    } catch (error) {
+      console.log("FETCH RECEIVED ENQUIRIES ERROR:", error);
+    }
+  }, [token]);
 
   // ========================================
   // FETCH MY ENQUIRIES
   // ========================================
 
-  const fetchMyEnquiries =
-    async () => {
+  const fetchMyEnquiries = useCallback(async () => {
+    if (!token) {
+      return;
+    }
 
-      if (!token) {
-        return;
-      }
-
-      try {
-
-        const response =
-          await fetch(
-            `${API_URL}/api/enquiries/buyer`,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (response.ok) {
-
-          setMyEnquiries(
-            Array.isArray(data)
-              ? data
-              : []
-          );
-
-        } else {
-
-          console.log(
-            "MY ENQUIRIES ERROR:",
-            data.message
-          );
-
+    try {
+      const response = await fetch(
+        `${API_URL}/api/enquiries/buyer`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
+      );
 
-      } catch (error) {
+      const data = await response.json();
 
-        console.log(
-          "FETCH MY ENQUIRIES ERROR:",
-          error
-        );
-
+      if (response.ok) {
+        setMyEnquiries(Array.isArray(data) ? data : []);
+      } else {
+        console.log("MY ENQUIRIES ERROR:", data.message);
       }
-    };
+    } catch (error) {
+      console.log("FETCH MY ENQUIRIES ERROR:", error);
+    }
+  }, [token]);
 
   // ========================================
   // LOAD ALL ENQUIRIES
   // ========================================
 
-  const loadEnquiries =
-    async () => {
-
-      if (!token) {
-
-        setLoading(false);
-
-        return;
-      }
-
-      setLoading(true);
-
-      await Promise.all([
-        fetchReceivedEnquiries(),
-        fetchMyEnquiries(),
-      ]);
-
+  const loadEnquiries = useCallback(async () => {
+    if (!token) {
       setLoading(false);
-    };
+      return;
+    }
+
+    setLoading(true);
+
+    await Promise.all([
+      fetchReceivedEnquiries(),
+      fetchMyEnquiries(),
+    ]);
+
+    setLoading(false);
+  }, [token, fetchReceivedEnquiries, fetchMyEnquiries]);
 
   // ========================================
   // INITIAL LOAD
   // ========================================
 
   useEffect(() => {
-
     loadEnquiries();
-
-  }, [token]);
+  }, [loadEnquiries]);
 
   // ========================================
   // OPEN ENQUIRY
   // ========================================
 
-  const openEnquiry =
-    async (enquiry) => {
+  const openEnquiry = useCallback(async (enquiry) => {
+    if (!enquiry) {
+      return;
+    }
 
-      if (!enquiry) {
-        return;
-      }
+    setSelectedEnquiry(enquiry);
+    setMessages([]);
+    setMessageLoading(true);
 
-      setSelectedEnquiry(
-        enquiry
+    try {
+      const response = await fetch(
+        `${API_URL}/api/enquiry-messages/${enquiry._id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
-      setMessages([]);
+      const data = await response.json();
 
-      setMessageLoading(true);
-
-      try {
-
-        /*
-          Reply feature is no longer used.
-          We only keep this request so old
-          enquiry message data does not break
-          the existing conversation screen.
-        */
-
-        const response =
-          await fetch(
-            `${API_URL}/api/enquiry-messages/${enquiry._id}`,
-            {
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-              },
-            }
-          );
-
-        const data =
-          await response.json();
-
-        if (response.ok) {
-
-          setMessages(
-            Array.isArray(data)
-              ? data
-              : []
-          );
-
-        } else {
-
-          setMessages([]);
-
-        }
-
-      } catch (error) {
-
-        console.log(
-          "LOAD MESSAGES ERROR:",
-          error
-        );
-
+      if (response.ok) {
+        setMessages(Array.isArray(data) ? data : []);
+      } else {
         setMessages([]);
-
-      } finally {
-
-        setMessageLoading(false);
-
       }
-    };
+    } catch (error) {
+      console.log("LOAD MESSAGES ERROR:", error);
+      setMessages([]);
+    } finally {
+      setMessageLoading(false);
+    }
+  }, [token]);
 
   // ========================================
   // OPEN INITIAL ENQUIRY
@@ -304,7 +236,6 @@ const Enquiries = ({
   // ========================================
 
   useEffect(() => {
-
     if (!initialEnquiryId) {
       return;
     }
@@ -314,38 +245,25 @@ const Enquiries = ({
       ...myEnquiries,
     ];
 
-    const foundEnquiry =
-      allEnquiries.find(
-        (item) =>
-          item._id ===
-          initialEnquiryId
-      );
+    const foundEnquiry = allEnquiries.find(
+      (item) => item._id === initialEnquiryId
+    );
 
     if (!foundEnquiry) {
       return;
     }
 
-    const isReceived =
-      receivedEnquiries.some(
-        (item) =>
-          item._id ===
-          initialEnquiryId
-      );
-
-    setActiveTab(
-      isReceived
-        ? "received"
-        : "sent"
+    const isReceived = receivedEnquiries.some(
+      (item) => item._id === initialEnquiryId
     );
 
-    openEnquiry(
-      foundEnquiry
-    );
-
+    setActiveTab(isReceived ? "received" : "sent");
+    openEnquiry(foundEnquiry);
   }, [
     initialEnquiryId,
     receivedEnquiries,
     myEnquiries,
+    openEnquiry,
   ]);
 
   // ========================================
@@ -616,32 +534,6 @@ const Enquiries = ({
 
       }
     };
-
-  // ========================================
-  // EMPTY STATE
-  // ========================================
-
-  const EmptyState = ({
-    title,
-    message,
-  }) => (
-
-    <div className="enquiries-empty">
-
-      <div className="empty-icon">
-        💬
-      </div>
-
-      <h3>
-        {title}
-      </h3>
-
-      <p>
-        {message}
-      </p>
-
-    </div>
-  );
 
   // ========================================
   // ENQUIRY CARD
@@ -1273,38 +1165,50 @@ const Enquiries = ({
                   </div>
 
                 ) : (
-
-                  <div className="message-bubble buyer-message">
-
-                    <div className="message-user">
-
-                      <strong>
-                        {selectedEnquiry
-                          .buyer
-                          ?.name ||
-                          "Buyer"}
-                      </strong>
-
-                      <span>
-                        Original Query
-                      </span>
-
+                  <>
+                    <div className="message-bubble buyer-message">
+                      <div className="message-user">
+                        <strong>
+                          {selectedEnquiry
+                            .buyer
+                            ?.name ||
+                            "Buyer"}
+                        </strong>
+                        <span>
+                          Original Query
+                        </span>
+                      </div>
+                      <p>
+                        {
+                          selectedEnquiry.message
+                        }
+                      </p>
+                      <small>
+                        {formatDate(
+                          selectedEnquiry.createdAt
+                        )}
+                      </small>
                     </div>
 
-                    <p>
-                      {
-                        selectedEnquiry.message
-                      }
-                    </p>
-
-                    <small>
-                      {formatDate(
-                        selectedEnquiry.createdAt
-                      )}
-                    </small>
-
-                  </div>
-
+                    {messages.map((msg) => {
+                      const isMe =
+                        String(msg.sender?._id || msg.sender) ===
+                        String(currentUser?.id || currentUser?._id);
+                      return (
+                        <div
+                          key={msg._id}
+                          className={`message-bubble ${isMe ? "my-message" : "other-message"}`}
+                        >
+                          <div className="message-user">
+                            <strong>{msg.sender?.name || "User"}</strong>
+                            <span>{isMe ? "You" : "Reply"}</span>
+                          </div>
+                          <p>{msg.message}</p>
+                          <small>{formatDate(msg.createdAt)}</small>
+                        </div>
+                      );
+                    })}
+                  </>
                 )}
 
               </div>

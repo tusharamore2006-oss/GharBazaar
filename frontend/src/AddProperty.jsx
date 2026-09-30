@@ -1,8 +1,9 @@
 import { useState } from "react";
 import "./AddProperty.css";
 
-const API_URL =
-  "https://gharbazaar-hb8d.onrender.com/api";
+import { API_BASE_URL } from "./config";
+
+const API_URL = API_BASE_URL;
 
 function AddProperty({
   token,
@@ -342,9 +343,7 @@ function AddProperty({
 
       <div className="add-property-card">
 
-        {/* ========================================
-            HEADER
-        ======================================== */}
+        {/* HEADER */}
 
         <div className="add-property-header">
 
@@ -371,18 +370,14 @@ function AddProperty({
 
         </div>
 
-        {/* ========================================
-            FORM
-        ======================================== */}
+        {/* FORM */}
 
         <form
           className="add-property-form"
           onSubmit={handleSubmit}
         >
 
-          {/* ========================================
-              PROPERTY INFORMATION
-          ======================================== */}
+          {/* PROPERTY INFORMATION */}
 
           <div className="form-section">
 
@@ -419,9 +414,7 @@ function AddProperty({
 
           </div>
 
-          {/* ========================================
-              PRICE AND LOCATION
-          ======================================== */}
+          {/* PRICE AND LOCATION */}
 
           <div className="form-section">
 
@@ -484,9 +477,7 @@ function AddProperty({
 
           </div>
 
-          {/* ========================================
-              PROPERTY DETAILS
-          ======================================== */}
+          {/* PROPERTY DETAILS */}
 
           <div className="form-section">
 
@@ -495,8 +486,6 @@ function AddProperty({
             </h2>
 
             <div className="form-grid">
-
-              {/* PROPERTY TYPE */}
 
               <div>
 
@@ -532,8 +521,6 @@ function AddProperty({
 
               </div>
 
-              {/* LISTING TYPE */}
-
               <div>
 
                 <label>
@@ -560,8 +547,6 @@ function AddProperty({
 
               </div>
 
-              {/* BEDROOMS */}
-
               <div>
 
                 <label>
@@ -581,8 +566,6 @@ function AddProperty({
                 />
 
               </div>
-
-              {/* BATHROOMS */}
 
               <div>
 
@@ -604,8 +587,6 @@ function AddProperty({
 
               </div>
 
-              {/* YEAR BUILT */}
-
               <div>
 
                 <label>
@@ -625,8 +606,6 @@ function AddProperty({
                 />
 
               </div>
-
-              {/* FURNISHED */}
 
               <div>
 
@@ -662,9 +641,7 @@ function AddProperty({
 
           </div>
 
-          {/* ========================================
-              PROPERTY PHOTOS
-          ======================================== */}
+          {/* PROPERTY PHOTOS */}
 
           <div className="form-section">
 
@@ -705,9 +682,7 @@ function AddProperty({
 
             </label>
 
-            {/* ========================================
-                PHOTO PREVIEW
-            ======================================== */}
+            {/* PHOTO PREVIEW */}
 
             {selectedImages.length > 0 && (
 
@@ -752,6 +727,7 @@ function AddProperty({
                       </div>
 
                     );
+
                   }
                 )}
 
@@ -770,9 +746,7 @@ function AddProperty({
 
           </div>
 
-          {/* ========================================
-              SUCCESS MESSAGE
-          ======================================== */}
+          {/* SUCCESS MESSAGE */}
 
           {message && (
 
@@ -782,9 +756,7 @@ function AddProperty({
 
           )}
 
-          {/* ========================================
-              ERROR MESSAGE
-          ======================================== */}
+          {/* ERROR MESSAGE */}
 
           {error && (
 
@@ -794,9 +766,7 @@ function AddProperty({
 
           )}
 
-          {/* ========================================
-              SUBMIT
-          ======================================== */}
+          {/* SUBMIT */}
 
           <button
             type="submit"

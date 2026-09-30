@@ -139,8 +139,12 @@ const getFavorites = async (req, res) => {
       });
     }
 
+    const validFavorites = (user.favorites || []).filter(
+      (item) => item !== null && typeof item === "object"
+    );
+
     res.json(
-      user.favorites
+      validFavorites
     );
 
   } catch (error) {

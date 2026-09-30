@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./Login.css";
+import { API_BASE_URL } from "./config";
 
 function Login({ onLoginSuccess }) {
   const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ function Login({ onLoginSuccess }) {
 
     try {
       const response = await fetch(
-        "https://gharbazaar-hb8d.onrender.com/api/auth/login",
+        `${API_BASE_URL}/auth/login`,
         {
           method: "POST",
           headers: {

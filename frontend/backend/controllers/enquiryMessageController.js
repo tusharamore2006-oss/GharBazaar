@@ -1,7 +1,6 @@
 const EnquiryMessage = require("../models/EnquiryMessage");
 const Enquiry = require("../models/Enquiry");
 const Notification = require("../models/Notification");
-const Property = require("../models/Property");
 
 // SEND REPLY
 const sendReply = async (req, res) => {
