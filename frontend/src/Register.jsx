@@ -2,11 +2,12 @@ import { useState } from "react";
 import "./Register.css";
 import { API_BASE_URL } from "./config";
 
-function Register() {
+function Register({ registrationRole = "Buyer", onBackToLogin }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
+    role: registrationRole,
     password: "",
     confirmPassword: "",
   });
@@ -59,6 +60,7 @@ function Register() {
             name: formData.name,
             email: formData.email,
             phone: formData.phone,
+            role: formData.role,
             password: formData.password,
           }),
         }
@@ -86,6 +88,7 @@ function Register() {
         name: "",
         email: "",
         phone: "",
+        role: registrationRole,
         password: "",
         confirmPassword: "",
       });
@@ -105,11 +108,13 @@ function Register() {
       <div className="register-card">
 
         <h1>
-          Create Account
+          {registrationRole === "Seller" ? "Broker / Seller Registration" : "Create Account"}
         </h1>
 
         <p className="register-subtitle">
-          Create your GharBazaar account
+          {registrationRole === "Seller"
+            ? "Create your GharBazaar Broker/Seller account"
+            : "Create your GharBazaar account"}
         </p>
 
 
@@ -166,6 +171,26 @@ function Register() {
             inputMode="numeric"
             required
           />
+
+          {registrationRole === "Seller" ? (
+            <>
+              <label htmlFor="accountType">Account Type</label>
+              <input id="accountType" value="Broker / Seller" readOnly />
+            </>
+          ) : (
+            <>
+              <label htmlFor="role">Account Type</label>
+              <select
+                id="role"
+                value={formData.role}
+                onChange={handleChange}
+                required
+              >
+                <option value="Buyer">Customer</option>
+                <option value="Seller">Broker / Seller</option>
+              </select>
+            </>
+          )}
 
 
           {/* PASSWORD */}
@@ -243,8 +268,14 @@ function Register() {
         <p className="login-text">
           Already have an account?{" "}
 
-          <a href="#">
-            Login
+          <a
+            href={registrationRole === "Seller" ? "/broker/login" : "/login"}
+            onClick={(event) => {
+              event.preventDefault();
+              onBackToLogin?.();
+            }}
+          >
+            {registrationRole === "Seller" ? "Broker Login" : "Customer Login"}
           </a>
         </p>
 

@@ -77,3 +77,26 @@
   font-weight: 600;
   text-decoration: none;
 }
+
+.login-role-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 22px;
+}
+
+.login-role-links a {
+  color: #147d6d;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-role-links a:hover {
+  text-decoration: underline;
+}
+
+.broker-login-page {
+  background: #f1f5f9;
+}

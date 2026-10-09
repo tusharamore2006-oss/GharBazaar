@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import Login from "./Login";
 import Register from "./Register";
+import AdminLogin from "./AdminLogin";
+import AdminDashboard from "./AdminDashboard";
 import AddProperty from "./AddProperty";
 import PropertyDetails from "./PropertyDetails";
 import Favorites from "./Favorites";
@@ -84,6 +86,30 @@ function App() {
 
     if (path === "/enquiries") {
       return "enquiries";
+    }
+
+    if (path === "/login") {
+      return "login";
+    }
+
+    if (path === "/register") {
+      return "register";
+    }
+
+    if (path === "/broker/login") {
+      return "broker-login";
+    }
+
+    if (path === "/broker/register") {
+      return "broker-register";
+    }
+
+    if (path === "/admin/login") {
+      return "admin-login";
+    }
+
+    if (path === "/admin") {
+      return "admin";
     }
 
     return "home";
@@ -383,6 +409,36 @@ function App() {
 
         setPage("enquiries");
 
+        return;
+      }
+
+      if (path === "/login") {
+        setPage("login");
+        return;
+      }
+
+      if (path === "/broker/login") {
+        setPage("broker-login");
+        return;
+      }
+
+      if (path === "/broker/register") {
+        setPage("broker-register");
+        return;
+      }
+
+      if (path === "/register") {
+        setPage("register");
+        return;
+      }
+
+      if (path === "/admin/login") {
+        setPage("admin-login");
+        return;
+      }
+
+      if (path === "/admin") {
+        setPage("admin");
         return;
       }
 
@@ -936,6 +992,76 @@ function App() {
 
     fetchNotifications(
       data.token
+    );
+  };
+
+  // ======================================
+  // ADMIN LOGIN SUCCESS
+  // ======================================
+
+  const handleAdminLoginSuccess = (
+    data
+  ) => {
+
+    localStorage.setItem(
+      "gharbazaar_token",
+      data.token
+    );
+
+    localStorage.setItem(
+      "gharbazaar_user",
+      JSON.stringify(
+        data.user
+      )
+    );
+
+    setToken(data.token);
+
+    setUser(data.user);
+
+    setNotifications([]);
+
+    setUnreadNotifications(0);
+
+    setShowNotifications(false);
+
+    setPage("admin");
+
+    window.history.pushState(
+      {},
+      "",
+      "/admin"
+    );
+
+    window.scrollTo({
+      top: 0,
+    });
+  };
+
+  // ======================================
+  // ADMIN SESSION EXPIRED
+  // ======================================
+
+  const handleAdminSessionExpired = () => {
+
+    localStorage.removeItem(
+      "gharbazaar_token"
+    );
+
+    localStorage.removeItem(
+      "gharbazaar_user"
+    );
+
+    setToken(null);
+
+    setUser(null);
+
+    setPage("admin-login");
+
+    window.history.pushState(
+      {},
+      "",
+      "/admin/login"
     );
   };
 
@@ -1747,6 +1873,45 @@ function App() {
         onLoginSuccess={
           handleLoginSuccess
         }
+
+        onAdminLogin={() => {
+          setPage("admin-login");
+
+          window.history.pushState(
+            {},
+            "",
+            "/admin/login"
+          );
+        }}
+        onBrokerLogin={() => {
+          setPage("broker-login");
+          window.history.pushState({}, "", "/broker/login");
+        }}
+        onRegister={() => {
+          setPage("register");
+          window.history.pushState({}, "", "/register");
+        }}
+      />
+    );
+  }
+
+  if (page === "broker-login") {
+    return (
+      <Login
+        loginType="broker"
+        onLoginSuccess={handleLoginSuccess}
+        onCustomerLogin={() => {
+          setPage("login");
+          window.history.pushState({}, "", "/login");
+        }}
+        onAdminLogin={() => {
+          setPage("admin-login");
+          window.history.pushState({}, "", "/admin/login");
+        }}
+        onRegister={() => {
+          setPage("broker-register");
+          window.history.pushState({}, "", "/broker/register");
+        }}
       />
     );
   }
@@ -1755,9 +1920,72 @@ function App() {
   // REGISTER PAGE
   // ======================================
 
-  if (page === "register") {
+  if (page === "register" || page === "broker-register") {
+    const isBrokerRegistration = page === "broker-register";
+    return (
+      <Register
+        registrationRole={isBrokerRegistration ? "Seller" : "Buyer"}
+        onBackToLogin={() => {
+          const nextPage = isBrokerRegistration ? "broker-login" : "login";
+          const nextPath = isBrokerRegistration ? "/broker/login" : "/login";
+          setPage(nextPage);
+          window.history.pushState({}, "", nextPath);
+        }}
+      />
+    );
+  }
 
-    return <Register />;
+  // ======================================
+  // ADMIN LOGIN / ADMIN DASHBOARD
+  // ======================================
+
+  if (
+    page === "admin" ||
+    page === "admin-login"
+  ) {
+
+    const isAdminLoggedIn = Boolean(
+      token &&
+      user &&
+      user.role === "Admin"
+    );
+
+    // Not an admin → show Admin Login
+    if (!isAdminLoggedIn) {
+      return (
+        <AdminLogin
+          onLoginSuccess={
+            handleAdminLoginSuccess
+          }
+
+          onBackToCustomerLogin={() => {
+            setPage("login");
+            window.history.pushState(
+              {},
+              "",
+              "/login"
+            );
+          }}
+          onBrokerLogin={() => {
+            setPage("broker-login");
+            window.history.pushState({}, "", "/broker/login");
+          }}
+        />
+      );
+    }
+
+    // Signed in as admin → Dashboard
+    return (
+      <AdminDashboard
+        token={token}
+        user={user}
+        onBack={handleHome}
+        onLogout={handleLogout}
+        onUnauthorized={
+          handleAdminSessionExpired
+        }
+      />
+    );
   }
 
   // ======================================
@@ -2742,6 +2970,24 @@ function App() {
               onClick={() => setPage("profile")}
             >
               👤 {user?.name ? user.name.split(" ")[0] : "Profile"}
+            </button>
+          )}
+
+          {/* ==================================
+              ADMIN DASHBOARD LINK (admins only)
+          ================================== */}
+
+          {token && user && user.role === "Admin" && (
+            <button
+              type="button"
+              className={`nav-link-btn ${page === "admin" ? "active" : ""}`}
+              onClick={() => {
+                setPage("admin");
+                window.history.pushState({}, "", "/admin");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              🛡️ Admin
             </button>
           )}
 

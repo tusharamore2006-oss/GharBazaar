@@ -38,7 +38,8 @@
   color: #24332f;
 }
 
-.register-form input {
+.register-form input,
+.register-form select {
   padding: 13px 15px;
   border: 1px solid #d5dfdc;
   border-radius: 8px;
@@ -47,6 +48,10 @@
 }
 
 .register-form input:focus {
+  border-color: #147d6d;
+}
+
+.register-form select:focus {
   border-color: #147d6d;
 }
 

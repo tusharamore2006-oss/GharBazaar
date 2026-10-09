@@ -42,6 +42,23 @@ const registerUser = async (req, res) => {
         10
       );
 
+    // ========================================
+    // ADMIN ROLE CANNOT BE SELF-ASSIGNED
+    // ========================================
+    // Admin accounts are created only through
+    // the seed-admin.js script.
+
+    const allowedRoles = [
+      "User",
+      "Buyer",
+      "Seller",
+    ];
+
+    const safeRole =
+      allowedRoles.includes(role)
+        ? role
+        : "User";
+
     const user =
       await User.create({
         name,
@@ -51,8 +68,7 @@ const registerUser = async (req, res) => {
           hashedPassword,
         phone:
           phone || "",
-        role:
-          role || "User",
+        role: safeRole,
       });
 
     res.status(201).json({
@@ -127,6 +143,24 @@ const loginUser = async (req, res) => {
       });
     }
 
+    // ========================================
+    // ADMINS MUST USE THE ADMIN LOGIN PAGE
+    // ========================================
+
+    if (user.role === "Admin") {
+      return res.status(403).json({
+        message:
+          "Admin accounts must sign in from the Admin Login page.",
+      });
+    }
+
+    if (user.role === "Seller") {
+      return res.status(403).json({
+        message:
+          "Broker/Seller accounts must sign in from the Broker Login page.",
+      });
+    }
+
     const token =
       jwt.sign(
         {
@@ -172,6 +206,60 @@ const loginUser = async (req, res) => {
       message:
         error.message,
     });
+  }
+};
+
+
+// ========================================
+// BROKER / SELLER LOGIN
+// ========================================
+
+const loginBroker = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    if (user.role !== "Seller") {
+      return res.status(403).json({
+        message: "Broker Login is for Broker/Seller accounts. Use Customer or Admin Login instead.",
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id.toString(), role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    return res.json({
+      message: "Broker login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("BROKER LOGIN ERROR:", error);
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -415,9 +503,172 @@ const changePassword = async (req, res) => {
 };
 
 
+// ========================================
+// ADMIN LOGIN
+// ========================================
+// Separate login for Admin accounts only.
+// Customer accounts are rejected here and
+// Admin accounts are rejected on /login.
+
+const loginAdmin = async (req, res) => {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message:
+          "Email and password are required",
+      });
+    }
+
+    const user =
+      await User.findOne({
+        email:
+          email.toLowerCase(),
+      });
+
+    if (!user) {
+      return res.status(401).json({
+        message:
+          "Invalid email or password",
+      });
+    }
+
+    const passwordMatch =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        message:
+          "Invalid email or password",
+      });
+    }
+
+    // ========================================
+    // ONLY ADMIN ACCOUNTS ALLOWED
+    // ========================================
+
+    if (user.role !== "Admin") {
+      return res.status(403).json({
+        message:
+          "Access denied. Admin accounts only. Please use the customer login.",
+      });
+    }
+
+    const token =
+      jwt.sign(
+        {
+          id:
+            user._id.toString(),
+
+          role:
+            user.role,
+        },
+
+        process.env.JWT_SECRET,
+
+        {
+          expiresIn:
+            "7d",
+        }
+      );
+
+    res.json({
+      message:
+        "Admin login successful",
+
+      token,
+
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone:
+          user.phone || "",
+        role: user.role,
+      },
+    });
+
+  } catch (error) {
+    console.log(
+      "ADMIN LOGIN ERROR:"
+    );
+
+    console.log(error);
+
+    res.status(500).json({
+      message:
+        error.message,
+    });
+  }
+};
+
+
+// ========================================
+// ADMIN REGISTRATION
+// ========================================
+
+const registerAdmin = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email and password are required",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const existingUser = await User.findOne({ email: normalizedEmail });
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: "Admin",
+    });
+
+    return res.status(201).json({
+      message: "Admin account created. You can now sign in.",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("ADMIN REGISTRATION ERROR:", error);
+    return res.status(500).json({ message: "Unable to register admin account" });
+  }
+};
+
+
 module.exports = {
   registerUser,
+  registerAdmin,
   loginUser,
+  loginBroker,
+  loginAdmin,
   getProfile,
   updateProfile,
   changePassword,

@@ -33,6 +33,9 @@ const notificationRoutes =
 const enquiryMessageRoutes =
   require("./routes/enquiryMessageRoutes");
 
+const adminRoutes =
+  require("./routes/adminRoutes");
+
 const app = express();
 
 
@@ -125,6 +128,16 @@ app.use(
 app.use(
   "/api/enquiry-messages",
   enquiryMessageRoutes
+);
+
+
+// ===============================
+// ADMIN ROUTES (Admin role only)
+// ===============================
+
+app.use(
+  "/api/admin",
+  adminRoutes
 );
 
 

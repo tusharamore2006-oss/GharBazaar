@@ -2,7 +2,14 @@ import { useState } from "react";
 import "./Login.css";
 import { API_BASE_URL } from "./config";
 
-function Login({ onLoginSuccess }) {
+function Login({
+  onLoginSuccess,
+  onAdminLogin,
+  onBrokerLogin,
+  onCustomerLogin,
+  onRegister,
+  loginType = "customer",
+}) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -28,7 +35,7 @@ function Login({ onLoginSuccess }) {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/auth/login`,
+        `${API_BASE_URL}/auth/${loginType === "broker" ? "broker-login" : "login"}`,
         {
           method: "POST",
           headers: {
@@ -78,15 +85,18 @@ function Login({ onLoginSuccess }) {
 
     setLoading(false);
   };
+  
 
   return (
-    <div className="login-page">
+    <div className={`login-page ${loginType === "broker" ? "broker-login-page" : ""}`}>
       <div className="login-card">
 
-        <h1>Welcome Back</h1>
+        <h1>{loginType === "broker" ? "Broker Login" : "Customer Login"}</h1>
 
         <p className="login-subtitle">
-          Login to your GharBazaar account
+          {loginType === "broker"
+            ? "Sign in to your Broker/Seller account"
+            : "Login to your GharBazaar customer account"}
         </p>
 
         <form
@@ -124,7 +134,9 @@ function Login({ onLoginSuccess }) {
             type="submit"
             disabled={loading}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading
+              ? "Logging in..."
+              : (loginType === "broker" ? "Login as Broker" : "Login as Customer")}
           </button>
         </form>
 
@@ -152,10 +164,31 @@ function Login({ onLoginSuccess }) {
 
         <p className="register-text">
           Don't have an account?{" "}
-          <a href="#">
-            Register
+          <a
+            href={loginType === "broker" ? "/broker/register" : "/register"}
+            onClick={(event) => {
+              event.preventDefault();
+              onRegister?.();
+            }}
+          >
+            {loginType === "broker" ? "Register as a Broker / Seller" : "Register"}
           </a>
         </p>
+
+        <div className="login-role-links" aria-label="Choose login type">
+          {loginType === "broker" ? (
+            <a href="/login" onClick={(event) => { event.preventDefault(); onCustomerLogin?.(); }}>
+              Customer Login
+            </a>
+          ) : (
+            <a href="/broker/login" onClick={(event) => { event.preventDefault(); onBrokerLogin?.(); }}>
+              Broker / Seller Login
+            </a>
+          )}
+          <a href="/admin/login" onClick={(event) => { event.preventDefault(); onAdminLogin?.(); }}>
+            Admin Login
+          </a>
+        </div>
 
       </div>
     </div>

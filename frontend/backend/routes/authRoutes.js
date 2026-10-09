@@ -2,7 +2,10 @@ const express = require("express");
 
 const {
   registerUser,
+  registerAdmin,
   loginUser,
+  loginBroker,
+  loginAdmin,
   getProfile,
   updateProfile,
   changePassword,
@@ -22,10 +25,31 @@ router.post(
 );
 
 
+// ADMIN REGISTRATION
+router.post(
+  "/admin-register",
+  registerAdmin
+);
+
+
 // LOGIN
 router.post(
   "/login",
   loginUser
+);
+
+
+// BROKER / SELLER LOGIN
+router.post(
+  "/broker-login",
+  loginBroker
+);
+
+
+// ADMIN LOGIN (separate from customer login)
+router.post(
+  "/admin-login",
+  loginAdmin
 );
 
 

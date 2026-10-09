@@ -1,0 +1,57 @@
+/* ========================================
+   ADMIN LOGIN PAGE
+   ======================================== */
+
+.admin-login-page {
+  background: #0f172a;
+}
+
+.admin-login-card {
+  border-top: 5px solid #f59e0b;
+}
+
+.admin-login-badge {
+  display: block;
+  width: fit-content;
+  margin: 0 auto 15px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.admin-login-card h1 {
+  color: #0f172a;
+  font-size: 32px;
+}
+
+.admin-login-button {
+  background: #b45309;
+}
+
+.admin-login-button:hover {
+  background: #92400e;
+}
+
+.admin-login-card .register-text a {
+  color: #b45309;
+}
+
+.admin-register-toggle button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b45309;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-register-toggle button:hover {
+  color: #92400e;
+  text-decoration: underline;
+}
